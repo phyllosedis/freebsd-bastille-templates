@@ -1,0 +1,1 @@
+MOUNT /usr/local/bastille/cache/pkg /var/cache/pkg shared
