@@ -1,13 +1,13 @@
 INCLUDE local/base-ssh
 
-PKG postgresql16-server-16.15 postgresql16-client-16.15
+PKG postgresql16-server postgresql16-client
 
 CONFIG set allow.sysvipc 1
 
-SYSRC postgresql_enable=yes
+SYSRC postgresql_enable="YES"
 
 SERVICE postgresql initdb
 
-CP files/pg_hba.conf.template /var/db/postgres/data16/pg_hba.conf
+LIF "host	all	all	0.0.0.0/0	scram-sha-256" /var/db/postgres/data16/pg_hba.conf
 
 SERVICE postgresql start
