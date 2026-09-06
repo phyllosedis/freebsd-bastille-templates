@@ -1,1 +1,1 @@
-MOUNT /usr/local/bastille/cache/pkg /var/cache/pkg shared
+MOUNT /usr/local/bastille/cache/pkg /var/cache/pkg nullfs rw 0 0
