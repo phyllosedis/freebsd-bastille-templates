@@ -8,6 +8,6 @@ SYSRC postgresql_enable=yes
 
 SERVICE postgresql initdb
 
-CP local/postgres/pg_hba.conf.template /var/db/postgres/data16/pg_hba.conf
+CP files/pg_hba.conf.template /var/db/postgres/data16/pg_hba.conf
 
 SERVICE postgresql start

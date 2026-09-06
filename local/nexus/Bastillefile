@@ -1,6 +1,6 @@
 INCLUDE local/base-ssh
 
-PKG openjdk8-8.482.08.1 nexus2-oss-2.15.1_3
+PKG openjdk8 nexus2-oss
 
 SYSRC nexus2_enable="YES"
 
