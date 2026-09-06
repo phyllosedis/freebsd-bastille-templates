@@ -1,0 +1,8 @@
+INCLUDE local/base-ssh
+
+SYSRC local_unbound_enable="YES"
+
+CP files/unbound.conf /var/unbound/unbound.conf
+
+CMD service local_unbound start
+

@@ -1,0 +1,8 @@
+INCLUDE local/base-ssh
+
+PKG openjdk8-8.482.08.1 nexus2-oss-2.15.1_3
+
+SYSRC nexus2_enable="YES"
+
+CMD service nexus2 start
+

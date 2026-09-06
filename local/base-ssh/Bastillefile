@@ -1,0 +1,17 @@
+# setup pkg
+INCLUDE local/pkg
+
+# setup ssh
+SYSRC sshd_enable="yes"
+CMD echo "Port 2202" >> /etc/ssh/sshd_config
+CMD echo "PermitRootLogin no" >> /etc/ssh/sshd_config
+CMD echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
+SERVICE sshd start
+
+
+# setup user: default
+# -m home, -s shell
+CMD pw useradd default -m -s /bin/sh 
+CMD sh -c 'echo "default" | pw usermod default -h 0'
+CMD chown -R default:default /home/default
+CMD chmod 750 /home/default

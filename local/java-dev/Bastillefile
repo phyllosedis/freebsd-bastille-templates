@@ -1,0 +1,2 @@
+PKG install -y openjdk21 maven
+CMD ln -sf /usr/local/openjdk21/bin/java /usr/local/bin/java
