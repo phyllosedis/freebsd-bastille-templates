@@ -1,3 +1,3 @@
 INCLUDE local/base-ssh
-PKG openjdk21 maven
-CMD ln -sf /usr/local/openjdk21/bin/java /usr/local/bin/java
+PKG openjdk25 maven
+CMD ln -sf /usr/local/openjdk25/bin/java /usr/local/bin/java
