@@ -1,7 +1,11 @@
 INCLUDE local/postgres
 
-CMD fetch -o /tmp/demo_small.zip https://edu.postgrespro.ru/demo_small.zip
+CMD if [ ! -d /tmp/downloads ]; then mkdir -p /tmp/downloads; fi
 
-CMD unzip -d /tmp /tmp/demo_small.zip
+MOUNT /usr/local/bastille/cache/downloads /tmp/downloads nullfs rw 0 0
+
+CMD if [ ! -f /tmp/downloads/demo_small.zip ]; then fetch -o /tmp/downloads/demo_small.zip https://edu.postgrespro.ru/demo_small.zip; fi
+
+CMD unzip -d /tmp /tmp/downloads/demo_small.zip
 
 CMD su - postgres -c "psql -f /tmp/demo_small.sql" > /tmp/demo.log 2> /tmp/demo.err
