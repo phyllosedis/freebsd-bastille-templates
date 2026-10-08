@@ -1,0 +1,11 @@
+INCLUDE local/base-ssh
+
+PKG kafka
+
+LIF "proc	/proc	procfs	rw	0	0" /etc/fstab
+
+SYSRC kafka_enable=YES
+
+LIF "PATH=$PATH:/usr/local/share/java/kafka/bin" $HOME/.profile
+
+SERVICE kafka start
