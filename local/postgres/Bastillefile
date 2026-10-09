@@ -10,8 +10,10 @@ PKG postgresql16-server postgresql16-client
 
 SYSRC postgresql_enable="YES"
 
-SERVICE postgresql initdb
+# initdb fails when the cluster already exists - init once
+CMD test -f /var/db/postgres/data16/PG_VERSION || service postgresql initdb
 
 LIF "host	all	all	0.0.0.0/0	scram-sha-256" /var/db/postgres/data16/pg_hba.conf
 
-SERVICE postgresql start
+# `service postgresql start` exits 1 when already running and fails re-apply
+CMD service postgresql status >/dev/null 2>&1 || service postgresql start

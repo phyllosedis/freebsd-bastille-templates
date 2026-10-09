@@ -4,5 +4,6 @@ PKG openjdk8 nexus2-oss
 
 SYSRC nexus2_enable="YES"
 
-CMD service nexus2 start
+# `service nexus2 start` exits 1 when already running and fails re-apply
+CMD service nexus2 status >/dev/null 2>&1 || service nexus2 start
 

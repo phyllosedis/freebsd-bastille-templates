@@ -2,10 +2,33 @@ INCLUDE local/base-ssh
 
 PKG kafka
 
-LIF "proc	/proc	procfs	rw	0	0" /etc/fstab
+# procfs is required by OpenJDK. Must be mounted via jail fstab
+# (LIF to /etc/fstab inside the jail does nothing - bastille mounts
+# from /usr/local/bastille/jails/<jail>/fstab on the host).
+FSTAB proc /proc procfs rw 0 0
 
 SYSRC kafka_enable=YES
 
-LIF "PATH=$PATH:/usr/local/share/java/kafka/bin" $HOME/.profile
+# Single quotes are intentional: with double quotes $PATH/$HOME expand
+# on the host at template-apply time (HOME=/home/aleksey) and the line
+# lands in /home/aleksey/.profile with the host PATH baked in.
+LIF 'PATH=$PATH:/usr/local/share/java/kafka/bin' /root/.profile
 
-SERVICE kafka start
+# Default server.properties advertises localhost, so remote clients
+# connecting to the jail IP get redirected to localhost and fail.
+# ${JAIL_IP} is substituted by bastille template at apply time.
+CMD sed -i '' 's|^advertised.listeners=.*|advertised.listeners=PLAINTEXT://${JAIL_IP}:9092,CONTROLLER://${JAIL_IP}:9093|' /usr/local/etc/kafka/server.properties
+
+# KRaft mode (Kafka 4.x): broker exits with
+# "No readable meta.properties files found" until log.dirs is formatted.
+# Idempotent: skip when already formatted (re-format would wipe data).
+CMD test -f /var/db/kafka/meta.properties || /usr/local/share/java/kafka/bin/kafka-storage.sh format -t "$(/usr/local/share/java/kafka/bin/kafka-storage.sh random-uuid)" --config /usr/local/etc/kafka/server.properties --standalone
+
+# format runs as root, but the daemon runs as kafka (see rc.d/kafka).
+# Must run inside the jail (host has no kafka user for chown).
+CMD chown -R kafka:kafka /var/db/kafka /var/log/kafka
+
+# `service kafka start` exits 1 when already running, which fails
+# template re-apply. Start only when not running (config changes
+# above need a manual `service kafka restart` to take effect).
+CMD service kafka status >/dev/null 2>&1 || service kafka start

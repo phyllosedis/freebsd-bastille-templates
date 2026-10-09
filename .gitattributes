@@ -1,0 +1,4 @@
+# Bastille runs on FreeBSD and does not strip CR characters:
+# a Bastillefile checked out with CRLF breaks (e.g. `INCLUDE local/base-ssh\r`
+# -> "not found"). Force LF even on Windows checkouts.
+**/Bastillefile text eol=lf

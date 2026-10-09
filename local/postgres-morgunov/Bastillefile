@@ -1,11 +1,15 @@
 INCLUDE local/postgres
 
-CMD if [ ! -d /tmp/downloads ]; then mkdir -p /tmp/downloads; fi
+CMD mkdir -p /tmp/downloads
 
 MOUNT /usr/local/bastille/cache/downloads /tmp/downloads nullfs rw 0 0
 
 CMD if [ ! -f /tmp/downloads/demo_small.zip ]; then fetch -o /tmp/downloads/demo_small.zip https://edu.postgrespro.ru/demo_small.zip; fi
 
-CMD unzip -d /tmp /tmp/downloads/demo_small.zip
+# /tmp is wiped on jail restart, the mount above is not - re-extract when missing
+CMD test -f /tmp/demo_small.sql || unzip -d /tmp /tmp/downloads/demo_small.zip
 
-CMD su - postgres -c "psql -f /tmp/demo_small.sql" > /tmp/demo.log 2> /tmp/demo.err
+# the dump is DROP+CREATE, but bare `psql -f` exits 3 on fresh load (DROP of
+# missing db) and needlessly reloads 100MB on every re-apply - load once.
+# pre-createdb makes DROP succeed so a fresh load exits 0.
+CMD su - postgres -c "psql -lqt" | cut -d'|' -f1 | grep -qw demo || (su - postgres -c "createdb demo" >/dev/null 2>&1; su - postgres -c "psql -f /tmp/demo_small.sql" > /tmp/demo.log 2> /tmp/demo.err)

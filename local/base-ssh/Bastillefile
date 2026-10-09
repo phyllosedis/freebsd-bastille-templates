@@ -8,7 +8,8 @@ LIF "Port 2202" /etc/ssh/sshd_config
 LIF "PermitRootLogin no" /etc/ssh/sshd_config
 LIF "PasswordAuthentication yes" /etc/ssh/sshd_config
 
-SERVICE sshd start
+# `service sshd start` exits 1 when already running and fails re-apply
+CMD service sshd status >/dev/null 2>&1 || service sshd start
 
 
 # setup user: default

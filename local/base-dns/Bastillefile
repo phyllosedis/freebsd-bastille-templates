@@ -4,5 +4,6 @@ SYSRC local_unbound_enable="YES"
 
 CP files/unbound.conf /var/unbound/unbound.conf
 
-CMD service local_unbound start
+# `service local_unbound start` exits 1 when already running and fails re-apply
+CMD service local_unbound status >/dev/null 2>&1 || service local_unbound start
 
