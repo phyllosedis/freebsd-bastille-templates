@@ -1,0 +1,11 @@
+# Grafana provisions this datasource on startup.
+# The url below is substituted by `bastille template --arg prometheus_url=...`.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: ${prometheus_url}
+    isDefault: true
+    editable: true

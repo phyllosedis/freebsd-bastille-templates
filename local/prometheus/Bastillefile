@@ -1,0 +1,18 @@
+INCLUDE local/base-ssh
+
+PKG prometheus node_exporter
+
+CP files/prometheus.yml /usr/local/etc/prometheus.yml
+
+# pkg does not create these; the daemons run as prometheus/nobody
+CMD mkdir -p /var/db/prometheus /var/tmp/node_exporter
+CMD chown prometheus:prometheus /usr/local/etc/prometheus.yml
+CMD chown -R prometheus:prometheus /var/db/prometheus
+CMD chown -R nobody:nobody /var/tmp/node_exporter
+
+SYSRC prometheus_enable=YES
+SYSRC node_exporter_enable=YES
+
+# bare start exits 1 when already running and fails re-apply
+CMD service prometheus status >/dev/null 2>&1 || service prometheus start
+CMD service node_exporter status >/dev/null 2>&1 || service node_exporter start

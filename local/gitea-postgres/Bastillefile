@@ -1,0 +1,16 @@
+# Dedicated postgres for gitea, co-located in the same jail via
+# INCLUDE from local/gitea.
+#
+# The DB password is a literal shared with local/gitea/files/app.ini
+# ON PURPOSE: --arg does NOT propagate through INCLUDE, so an ARG here
+# would desync from app.ini. To rotate, edit the password here AND
+# in app.ini.
+INCLUDE local/postgres
+
+# One-shot DB bootstrap as SQL, fully idempotent (IF NOT EXISTS).
+# NOTE: CMD lines cannot contain single quotes (they terminate
+# bastille's sh -c '...' wrapping and get mangled), hence the SQL
+# lives in a file written by LIF (LIF uses "..." wrapping and is safe).
+LIF "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'gitea') THEN CREATE ROLE gitea LOGIN PASSWORD 'gitea-pg-dev-secret'; END IF; END \$\$;" /tmp/gitea-init.sql
+LIF "SELECT 'CREATE DATABASE gitea OWNER gitea' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'gitea')\\gexec" /tmp/gitea-init.sql
+CMD su - postgres -c "psql -f /tmp/gitea-init.sql"

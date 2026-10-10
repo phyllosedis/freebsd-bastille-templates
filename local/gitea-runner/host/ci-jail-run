@@ -1,0 +1,62 @@
+#!/bin/sh
+#
+# ci-jail-run - run a command in an ephemeral bastille jail (for CI).
+#
+# Install once on the bastille HOST (NOT in a jail):
+#   cp ci-jail-run /usr/local/bin/ && chmod +x /usr/local/bin/ci-jail-run
+# Allow the CI ssh user to run it passwordless via doas, e.g. in
+# /usr/local/etc/doas.conf:
+#   permit nopass keepenv ci as root cmd /usr/local/bin/ci-jail-run
+#
+# usage: ci-jail-run NAME IP TEMPLATE [TEMPLATE...] -- CMD [ARGS...]
+# env: BASTILLE_RELEASE (default 15.1-RELEASE),
+#      BASTILLE_IFACE (default em0)
+#
+# The jail is ALWAYS destroyed afterwards; the exit code is the CMD one.
+# Must run as root: re-execs itself via doas when called by the CI user
+# (the doas rule above covers exactly this path, any args).
+# Example (from a gitea workflow step, see ../files/example-ci.yml):
+#   ssh ci@bastille-host ci-jail-run "ci-$GITHUB_RUN_ID" 192.168.0.90 \
+#     local/java-dev -- sh -c 'pkg install -y git && git clone ... && make test'
+
+if [ "$(id -u)" -ne 0 ]; then
+	exec doas /usr/local/bin/ci-jail-run "$@"
+fi
+
+set -e
+
+if [ $# -lt 4 ]; then
+	echo "usage: $0 NAME IP TEMPLATE [TEMPLATE...] -- CMD [ARGS...]" >&2
+	exit 2
+fi
+
+NAME=$1
+IP=$2
+shift 2
+
+TEMPLATES=""
+while [ $# -gt 0 ] && [ "$1" != "--" ]; do
+	TEMPLATES="$TEMPLATES $1"
+	shift
+done
+if [ "$1" != "--" ]; then
+	echo "usage: $0 NAME IP TEMPLATE [TEMPLATE...] -- CMD [ARGS...]" >&2
+	exit 2
+fi
+shift
+
+RELEASE=${BASTILLE_RELEASE:-15.1-RELEASE}
+IFACE=${BASTILLE_IFACE:-em0}
+
+cleanup() {
+	# stop first: destroying a running jail often hits busy datasets
+	bastille stop "$NAME" >/dev/null 2>&1 || true
+	bastille destroy -f -y "$NAME" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+
+bastille create "$NAME" "$RELEASE" "$IP" "$IFACE"
+for t in $TEMPLATES; do
+	bastille template "$NAME" "$t"
+done
+jexec "$NAME" "$@"

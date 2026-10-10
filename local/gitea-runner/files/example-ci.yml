@@ -1,0 +1,25 @@
+# Example Gitea Actions workflow: run tests in an ephemeral bastille jail.
+# Copy to .gitea/workflows/ci.yml in your repo. Jobs run with the host
+# executor on FreeBSD runners (label from local/gitea-runner).
+#
+# Prerequisites (once):
+#   1. local/gitea-runner/host/ci-jail-run installed on the bastille host
+#      (see the header comment there) + doas rule for the CI ssh user.
+#      The host sshd here listens on 2202 - adjust -p if yours differs.
+#   2. Runner jail pubkey (/var/db/act_runner/.ssh/id_ed25519.pub inside
+#      the runner jail) added to the CI user authorized_keys on the host.
+#   3. A free jail IP below (must not collide with existing jails).
+#   4. Repo/token secrets below adjusted (GITEA_TOKEN with repo scope).
+name: ci
+on: [push]
+
+jobs:
+  test:
+    runs-on: FreeBSD
+    steps:
+      - name: run tests in ephemeral jail
+        run: |
+          ssh -o StrictHostKeyChecking=no -o BatchMode=yes -p 2202 ci@192.168.0.86 \
+            ci-jail-run "ci-${GITHUB_RUN_ID}" 192.168.0.90 \
+            local/java-dev -- \
+            sh -c 'pkg install -y git && git clone --depth 1 "${GITEA_SERVER_URL}/${GITHUB_REPOSITORY}.git" /work && cd /work && ls'

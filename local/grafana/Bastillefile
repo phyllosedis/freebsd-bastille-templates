@@ -1,0 +1,20 @@
+# Mandatory: pass the Prometheus URL at apply time, e.g.
+#   bastille template mygrafana local/grafana --arg prometheus_url=http://192.168.0.70:9090
+ARG+ prometheus_url
+
+INCLUDE local/base-ssh
+
+PKG grafana
+
+CP files/datasource.yml /usr/local/etc/grafana/provisioning/datasources/prometheus.yml
+
+# substitute ${prometheus_url} in the provisioned datasource
+RENDER /usr/local/etc/grafana/provisioning/datasources/prometheus.yml
+
+CMD chown grafana:grafana /usr/local/etc/grafana/provisioning/datasources/prometheus.yml
+
+SYSRC grafana_enable=YES
+
+# bare start exits 1 when already running and fails re-apply
+# default login: admin / admin (change on first login)
+CMD service grafana status >/dev/null 2>&1 || service grafana start

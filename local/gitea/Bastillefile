@@ -1,0 +1,40 @@
+# Gitea with its own co-located postgres (local/gitea-postgres).
+# Apply plainly: bastille template myjail local/gitea
+# Override the admin password: --arg gitea_admin_password=...
+# (safe charset for the value: A-Za-z0-9_.- )
+ARG gitea_admin_password=admin-secret-change-me
+
+INCLUDE local/gitea-postgres
+
+PKG gitea
+
+CP files/app.ini /usr/local/etc/gitea/conf/app.ini.dist
+
+# never clobber a live app.ini (it holds generated secrets, see below):
+# install from dist only once, upgrades are manual
+CMD test -f /usr/local/etc/gitea/conf/app.ini || cp /usr/local/etc/gitea/conf/app.ini.dist /usr/local/etc/gitea/conf/app.ini
+
+# substitute ${JAIL_IP} in server URLs (no-op when already rendered)
+RENDER /usr/local/etc/gitea/conf/app.ini
+
+# secrets are one-time generated below, so lock the file down now
+CMD chown git:git /usr/local/etc/gitea/conf/app.ini
+CMD chmod 640 /usr/local/etc/gitea/conf/app.ini
+
+# first apply only: fill placeholder secrets with generated values.
+# guarded on the key lines (NOT bare CHANGE_ME - it also occurs in
+# comments) - re-apply must NOT rotate secrets (would drop sessions).
+CMD grep -qE '^(SECRET_KEY|INTERNAL_TOKEN|JWT_SECRET) *= *CHANGE_ME' /usr/local/etc/gitea/conf/app.ini && for k in SECRET_KEY INTERNAL_TOKEN JWT_SECRET; do S=$(su -m git -c "/usr/local/sbin/gitea generate secret $k"); sed -i '' "s|^$k[[:space:]]*=.*|$k = $S|" /usr/local/etc/gitea/conf/app.ini; done; true
+
+SYSRC gitea_enable=YES
+
+# migrate the (possibly fresh) database; no-op when already migrated.
+# the admin CLI below needs the tables to exist, web would migrate
+# them lazily at boot which is too late and racy here.
+CMD su -m git -c "GITEA_WORK_DIR=/usr/local/share/gitea GITEA_CUSTOM=/usr/local/etc/gitea /usr/local/sbin/gitea migrate" >/dev/null
+
+# create the admin once (CLI must run as git, never root)
+CMD su -m git -c "GITEA_WORK_DIR=/usr/local/share/gitea GITEA_CUSTOM=/usr/local/etc/gitea /usr/local/sbin/gitea admin user list" 2>/dev/null | grep -qw admin || su -m git -c "GITEA_WORK_DIR=/usr/local/share/gitea GITEA_CUSTOM=/usr/local/etc/gitea /usr/local/sbin/gitea admin user create --admin --username admin --password ${gitea_admin_password} --email admin@localhost --must-change-password=false" >/dev/null
+
+# bare start exits 1 when already running and fails re-apply
+CMD service gitea status >/dev/null 2>&1 || service gitea start

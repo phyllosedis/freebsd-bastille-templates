@@ -1,9 +1,43 @@
 INCLUDE local/base-ssh
 
-PKG openjdk8 nexus2-oss
+# Nexus 3 has no FreeBSD port. Distribution comes from the official
+# docker image (sonatype/nexus3:3.70.1) layer on Docker Hub instead of
+# download.sonatype.com (bulk download stalls from here, headers only).
+# The blob digest below is content-addressed AND verified after
+# download, so it doubles as integrity check. To bump versions,
+# re-resolve tag -> layer digest via the Hub API (see comments).
+PKG openjdk8 curl
 
-SYSRC nexus2_enable="YES"
+# procfs is required by OpenJDK (see local/kafka for why FSTAB, not LIF)
+FSTAB proc /proc procfs rw 0 0
 
-# `service nexus2 start` exits 1 when already running and fails re-apply
-CMD service nexus2 status >/dev/null 2>&1 || service nexus2 start
+CMD pw usershow nexus >/dev/null 2>&1 || pw useradd nexus -u 200 -d /usr/local/sonatype-work -s /bin/sh -c "Nexus Repository Manager"
 
+CMD mkdir -p /usr/local/sonatype-work /tmp/downloads
+
+MOUNT /usr/local/bastille/cache/downloads /tmp/downloads nullfs rw 0 0
+
+CMD test -x /usr/local/nexus/bin/nexus || test -f /tmp/downloads/nexus-3.70.1-hub.tgz || fetch -q -o /tmp/dhub-token.json "https://auth.docker.io/token?service=registry.docker.io&scope=repository:sonatype/nexus3:pull"
+
+CMD test -x /usr/local/nexus/bin/nexus || test -f /tmp/downloads/nexus-3.70.1-hub.tgz || /usr/local/bin/curl -fSL -H "Authorization: Bearer $(grep -o eyJ[A-Za-z0-9_.-]* /tmp/dhub-token.json | head -n 1)" https://registry-1.docker.io/v2/sonatype/nexus3/blobs/sha256:8b28409ea1777c45d4958ec02f9f7d59ac7a2e645dacb77709f348ede77920de -o /tmp/downloads/nexus-3.70.1-hub.tgz
+
+CMD test -x /usr/local/nexus/bin/nexus || (test "$(sha256 -q /tmp/downloads/nexus-3.70.1-hub.tgz)" = "8b28409ea1777c45d4958ec02f9f7d59ac7a2e645dacb77709f348ede77920de" || (echo "nexus blob sha256 mismatch" >&2; exit 1))
+
+CMD test -x /usr/local/nexus/bin/nexus || (mkdir -p /tmp/nxdist && tar -xf /tmp/downloads/nexus-3.70.1-hub.tgz -C /tmp/nxdist opt/sonatype/nexus && mv /tmp/nxdist/opt/sonatype/nexus /usr/local/nexus && rm -rf /tmp/nxdist)
+
+CMD chown -R nexus:nexus /usr/local/nexus /usr/local/sonatype-work
+
+# upstream docker strips these from nexus.vmoptions and sizes the heap
+# via INSTALL4J_ADD_VM_PARAMS instead (see files/nexus) - same here
+CMD sed -i '' '/^-Xms/d; /^-Xmx/d; /^-XX:MaxDirectMemorySize/d' /usr/local/nexus/bin/nexus.vmoptions
+
+CP files/nexus /usr/local/etc/rc.d/nexus
+
+CMD chmod +x /usr/local/etc/rc.d/nexus
+
+SYSRC nexus_enable=YES
+
+# first start takes minutes; the admin password lands in
+# /usr/local/sonatype-work/nexus3/admin.password until the setup wizard runs.
+# bare start exits 1 when already running and fails re-apply.
+CMD service nexus status >/dev/null 2>&1 || service nexus start

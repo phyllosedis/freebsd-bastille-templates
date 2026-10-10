@@ -1,0 +1,57 @@
+#!/bin/sh
+
+# PROVIDE: act_runner
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+#
+# Custom rc for bastille: the port rc passes -u to daemon(8), whose
+# setusercontext fails for the act_runner user inside jails
+# ("failed to set user environment", daemon loops forever).
+# rc.subr user switching (act_runner_user) works instead.
+#
+# Add the following line to /etc/rc.conf to enable:
+#
+# act_runner_enable="YES"
+
+. /etc/rc.subr
+
+name=act_runner
+rcvar=act_runner_enable
+
+load_rc_config "${name}"
+
+: ${act_runner_enable:="NO"}
+: ${act_runner_user:="act_runner"}
+: ${act_runner_group:="act_runner"}
+: ${act_runner_config:="/usr/local/etc/act_runner/act_runner.conf"}
+: ${act_runner_pidfile:="/var/run/act_runner.pid"}
+: ${act_runner_log:="/var/log/act_runner/act_runner.log"}
+
+# the daemon needs a writable HOME (job workdirs, ~/.cache).
+# rc.subr does not set it; without this jobs die with
+# "mkdir /.cache: permission denied".
+HOME="/var/db/act_runner"
+export HOME
+
+start_precmd="act_runner_start_precmd"
+
+required_files="${act_runner_config}"
+
+command="/usr/sbin/daemon"
+pidfile="${act_runner_pidfile}"
+command_args="-o ${act_runner_log} -P ${pidfile} -t ${name} /usr/local/bin/act_runner -c ${act_runner_config} daemon"
+
+act_runner_start_precmd()
+{
+	if [ ! -d /var/log/act_runner ]; then
+		install -d -o "${act_runner_user}" -g "${act_runner_group}" -m 755 /var/log/act_runner
+	fi
+	if [ ! -e "${act_runner_pidfile}" ]; then
+		install -m 0600 -o "${act_runner_user}" -g "${act_runner_group}" /dev/null "${act_runner_pidfile}"
+	fi
+	if [ ! -e "${act_runner_log}" ]; then
+		install -m 0640 -o "${act_runner_user}" -g "${act_runner_group}" /dev/null "${act_runner_log}"
+	fi
+}
+
+run_rc_command "$1"

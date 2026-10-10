@@ -12,4 +12,6 @@ CMD test -f /tmp/demo_small.sql || unzip -d /tmp /tmp/downloads/demo_small.zip
 # the dump is DROP+CREATE, but bare `psql -f` exits 3 on fresh load (DROP of
 # missing db) and needlessly reloads 100MB on every re-apply - load once.
 # pre-createdb makes DROP succeed so a fresh load exits 0.
-CMD su - postgres -c "psql -lqt" | cut -d'|' -f1 | grep -qw demo || (su - postgres -c "createdb demo" >/dev/null 2>&1; su - postgres -c "psql -f /tmp/demo_small.sql" > /tmp/demo.log 2> /tmp/demo.err)
+# NOTE: no single quotes in CMD lines - they terminate bastille's
+# sh -c '...' wrapping and get mangled, hence cut -d\| instead of '|'.
+CMD su - postgres -c "psql -lqt" | cut -d\| -f1 | grep -qw demo || (su - postgres -c "createdb demo" >/dev/null 2>&1; su - postgres -c "psql -f /tmp/demo_small.sql" > /tmp/demo.log 2> /tmp/demo.err)

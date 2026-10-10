@@ -1,0 +1,68 @@
+#!/bin/sh
+
+# PROVIDE: nexus
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+#
+# Sonatype Nexus Repository 3 in foreground mode (`bin/nexus run`,
+# same as the upstream docker image) supervised by daemon(8).
+# The install4j `start/stop` wrapper misbehaves under rc.subr,
+# foreground mode is reliable instead.
+#
+# Add the following line to /etc/rc.conf to enable:
+#
+# nexus_enable="YES"
+#
+# Optional knobs (defaults shown, heap deliberately small for a homelab):
+#
+# nexus_user="nexus"
+# nexus_home="/usr/local/nexus"
+# nexus_xms="512m"
+# nexus_xmx="1024m"
+# nexus_direct="512m"
+
+. /etc/rc.subr
+
+name=nexus
+rcvar=nexus_enable
+
+load_rc_config "${name}"
+
+: ${nexus_enable:="NO"}
+: ${nexus_user:="nexus"}
+: ${nexus_group:="nexus"}
+: ${nexus_home:="/usr/local/nexus"}
+: ${nexus_xms:="512m"}
+: ${nexus_xmx:="1024m"}
+: ${nexus_direct:="512m"}
+: ${nexus_pidfile:="/var/run/nexus.pid"}
+: ${nexus_log:="/var/log/nexus.log"}
+
+# picked up by the install4j launcher, same as upstream docker
+INSTALL4J_ADD_VM_PARAMS="-Xms${nexus_xms} -Xmx${nexus_xmx} -XX:MaxDirectMemorySize=${nexus_direct} -Djava.util.prefs.userRoot=/usr/local/sonatype-work/javaprefs"
+export INSTALL4J_ADD_VM_PARAMS
+
+# pin the JVM explicitly: the install4j search depends on PATH/HOME
+# and finds nothing under rc.subr ("No suitable Java Virtual Machine")
+INSTALL4J_JAVA_HOME_OVERRIDE="/usr/local/openjdk8"
+export INSTALL4J_JAVA_HOME_OVERRIDE
+
+start_precmd="nexus_start_precmd"
+
+required_files="${nexus_home}/bin/nexus"
+
+command="/usr/sbin/daemon"
+pidfile="${nexus_pidfile}"
+command_args="-o ${nexus_log} -P ${pidfile} -t ${name} ${nexus_home}/bin/nexus run"
+
+nexus_start_precmd()
+{
+	if [ ! -e "${nexus_pidfile}" ]; then
+		install -m 0600 -o "${nexus_user}" -g "${nexus_group}" /dev/null "${nexus_pidfile}"
+	fi
+	if [ ! -e "${nexus_log}" ]; then
+		install -m 0640 -o "${nexus_user}" -g "${nexus_group}" /dev/null "${nexus_log}"
+	fi
+}
+
+run_rc_command "$1"

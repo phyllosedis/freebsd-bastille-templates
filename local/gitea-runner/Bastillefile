@@ -1,0 +1,50 @@
+# Gitea Actions runner with the host executor (no docker on FreeBSD).
+#
+# Mandatory: gitea instance URL + registration token.
+#   bastille template myrunner local/gitea-runner \
+#     --arg gitea_instance=http://192.168.0.60:3000 \
+#     --arg runner_token=...
+# Token: gitea admin -> Management -> Actions -> Runners -> Create,
+# or per-repo: repo Settings -> Actions -> Runners -> Create runner.
+# NOTE: keep the token handy for every new jail (re-apply on the
+# SAME jail reuses .runner and needs no token).
+ARG+ gitea_instance
+ARG+ runner_token
+ARG runner_name=bastille-runner
+ARG runner_labels=FreeBSD:host
+
+INCLUDE local/base-ssh
+
+PKG gitea-act_runner
+
+CP files/act_runner.conf /usr/local/etc/act_runner/act_runner.conf
+CP files/act_runner /usr/local/etc/rc.d/act_runner
+CMD chmod +x /usr/local/etc/rc.d/act_runner
+
+# substitute ${runner_labels} in the config above
+RENDER /usr/local/etc/act_runner/act_runner.conf
+CMD chown act_runner:act_runner /usr/local/etc/act_runner/act_runner.conf
+CMD chmod 640 /usr/local/etc/act_runner/act_runner.conf
+
+# home must belong to the user (ssh keys, job workdirs)
+CMD chown act_runner:act_runner /var/db/act_runner
+
+# ssh key for the bastille host: CI jobs ssh from here to the host to
+# spin up ephemeral test jails (see host/ci-jail-run, install it on the
+# host once, then add this pubkey to the CI user on the host).
+# Guarded: re-apply must NOT rotate the key (host authorized_keys).
+CMD test -f /var/db/act_runner/.ssh/id_ed25519 || (mkdir -p /var/db/act_runner/.ssh && ssh-keygen -t ed25519 -N "" -f /var/db/act_runner/.ssh/id_ed25519 -C runner@${JAIL_NAME} && chown -R act_runner:act_runner /var/db/act_runner/.ssh && chmod 700 /var/db/act_runner/.ssh && chmod 600 /var/db/act_runner/.ssh/id_ed25519)
+
+# register once, guarded on the credentials file (re-register would
+# invalidate the token and duplicate the runner server-side).
+# Runner file path is absolute in files/act_runner.conf on purpose:
+# the default (.runner) resolves against cwd, which differs between
+# register-time and daemon-time. Runs as root (act_runner login
+# shell is nologin), ownership fixed below.
+CMD test -s /var/db/act_runner/.runner || /usr/local/bin/act_runner register --no-interactive --instance ${gitea_instance} --token ${runner_token} --name ${runner_name} --labels ${runner_labels} --config /usr/local/etc/act_runner/act_runner.conf
+CMD chown act_runner:act_runner /var/db/act_runner/.runner
+CMD rm -f /root/.runner
+
+SYSRC act_runner_enable=YES
+
+CMD service act_runner status >/dev/null 2>&1 || service act_runner start
