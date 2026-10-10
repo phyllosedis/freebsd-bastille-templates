@@ -1,0 +1,63 @@
+#!/bin/sh
+
+# PROVIDE: kafka_ui
+# REQUIRE: NETWORKING SERVERS kafka
+# KEYWORD: shutdown
+#
+# Kafbat UI - web viewer for Kafka (https://github.com/kafbat/kafka-ui).
+# The standalone jar reads the same environment as the docker image,
+# see https://ui.docs.kafbat.io/configuration/misc-configuration-properties
+#
+# Add the following line to /etc/rc.conf to enable:
+#
+# kafka_ui_enable="YES"
+#
+# Optional knobs (defaults shown):
+#
+# kafka_ui_user="kafka"
+# kafka_ui_java="/usr/local/openjdk25/bin/java"
+# kafka_ui_jar="/usr/local/share/kafbat-ui/api-1.5.0.jar"
+# kafka_ui_port="8080"
+# kafka_ui_java_opts="-Xmx512m"
+
+. /etc/rc.subr
+
+name=kafka_ui
+rcvar=kafka_ui_enable
+
+load_rc_config "${name}"
+
+: ${kafka_ui_enable:="NO"}
+: ${kafka_ui_user:="kafka"}
+: ${kafka_ui_group:="kafka"}
+: ${kafka_ui_java:="/usr/local/openjdk25/bin/java"}
+: ${kafka_ui_jar:="/usr/local/share/kafbat-ui/api-1.5.0.jar"}
+: ${kafka_ui_port:="8080"}
+: ${kafka_ui_java_opts:="-Xmx512m"}
+: ${kafka_ui_pidfile:="/var/run/kafka-ui.pid"}
+: ${kafka_ui_log:="/var/log/kafka-ui.log"}
+
+KAFKA_CLUSTERS_0_NAME="${KAFKA_CLUSTERS_0_NAME:-local}"
+KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS="${KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS:-localhost:9092}"
+SERVER_PORT="${SERVER_PORT:-${kafka_ui_port}}"
+export KAFKA_CLUSTERS_0_NAME KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS SERVER_PORT
+
+start_precmd="kafka_ui_start_precmd"
+
+required_files="${kafka_ui_jar}"
+
+command="/usr/sbin/daemon"
+pidfile="${kafka_ui_pidfile}"
+command_args="-o ${kafka_ui_log} -P ${pidfile} -t ${name} ${kafka_ui_java} ${kafka_ui_java_opts} -jar ${kafka_ui_jar}"
+
+kafka_ui_start_precmd()
+{
+	if [ ! -e "${kafka_ui_pidfile}" ]; then
+		install -m 0600 -o "${kafka_ui_user}" -g "${kafka_ui_group}" /dev/null "${kafka_ui_pidfile}"
+	fi
+	if [ ! -e "${kafka_ui_log}" ]; then
+		install -m 0640 -o "${kafka_ui_user}" -g "${kafka_ui_group}" /dev/null "${kafka_ui_log}"
+	fi
+}
+
+run_rc_command "$1"

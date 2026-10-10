@@ -32,3 +32,21 @@ CMD chown -R kafka:kafka /var/db/kafka /var/log/kafka
 # template re-apply. Start only when not running (config changes
 # above need a manual `service kafka restart` to take effect).
 CMD service kafka status >/dev/null 2>&1 || service kafka start
+
+# Kafbat UI - web viewer for Kafka (https://github.com/kafbat/kafka-ui).
+# The 1.5.0 jar targets the same java as the broker itself
+# (openjdk25, pulled in by PKG kafka), no extra JDK needed.
+
+CMD mkdir -p /usr/local/share/kafbat-ui
+
+# jar version is duplicated in files/kafka-ui (kafka_ui_jar default)
+CMD test -f /usr/local/share/kafbat-ui/api-1.5.0.jar || fetch -o /usr/local/share/kafbat-ui/api-1.5.0.jar https://github.com/kafbat/kafka-ui/releases/download/v1.5.0/api-v1.5.0.jar
+
+CP files/kafka-ui /usr/local/etc/rc.d/kafka-ui
+
+CMD chmod +x /usr/local/etc/rc.d/kafka-ui
+
+SYSRC kafka_ui_enable=YES
+
+# same guard pattern: bare start fails re-apply when already running
+CMD service kafka-ui status >/dev/null 2>&1 || service kafka-ui start
